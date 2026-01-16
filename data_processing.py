@@ -52,33 +52,41 @@ def load_and_process_data(filepath, year_start, year_end, province_filter=None, 
             # Check for main parties substring
             name_upper = str(name).upper()
             
-            # Andalucistas Grouping
-            # Andalucistas Grouping & Splits
-            # Prioritize specific checks
+            # Specific Andalucista/Regional Splitting (User Request: NEVER GROUP)
             
-            # Adelante Andalucía (AA) - Keep separate
+            # 1. Adelante Andalucía
             if 'ADELANTE' in name_upper or 'AA' in name_upper: 
                 return 'Adelante Andalucía'
                 
-            # AxSi - Keep separate
-            if (name_upper == 'AXSI' or 
-                'ANDALUCIA POR SI' in name_upper):
+            # 2. AxSi
+            if 'AXSI' in name_upper or 'ANDALUCIA POR SI' in name_upper:
                 return 'AxSi'
             
-            # Traditional Andalucistas (PA, PSA)
-            if (name_upper == 'PA' or 
-                name_upper == 'PSA' or
-                'PARTIDO ANDALUCISTA' in name_upper or 
-                'ANDALUCISTAS' in name_upper): 
-                return 'Andalucistas'
+            # 3. PA
+            if 'PA' == name_upper or 'PARTIDO ANDALUCISTA' in name_upper or 'PSA' == name_upper: 
+                return 'PA'
+
+            # 3b. CA (Coalición Andalucista - 2008)
+            if 'CA' == name_upper or 'COALICION ANDALUCISTA' in name_upper or 'COALICIÓN ANDALUCISTA' in name_upper:
+                return 'CA'
+                
+            # 4. NA (Nación Andaluza)
+            if 'NA' == name_upper or 'NACION ANDALUZA' in name_upper or 'NACIÓN ANDALUZA' in name_upper:
+                return 'NA'
+                
+            # 5. Other Andalusians (Preserve Name)
+            if 'PCPA' in name_upper: return 'PCPA'
+            if 'RISA' in name_upper: return 'RISA'
+            if 'IZAR' in name_upper: return 'IZAR'
+            if 'PRAO' in name_upper: return 'PRAO'
+            if 'PNDEA' in name_upper: return 'PNdeA'
             
+            # Main Parties
             if 'PSOE' in name_upper: return 'PSOE'
             if 'PP' in name_upper or 'POPULAR' in name_upper: return 'PP'
             if 'VOX' in name_upper: return 'VOX'
             if 'CIUDADANOS' in name_upper or 'CS' in name_upper: return 'Cs'
             
-            # Note: If Adelante is processed above, 'Podemos' and 'IU' here usually catch 2015 
-            # or separate lists.
             if 'PODEMOS' in name_upper: return 'Podemos'
             if 'IULV' in name_upper or 'IZQUIERDA UNIDA' in name_upper or 'IU' in name_upper: return 'IU'
             

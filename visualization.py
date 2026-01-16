@@ -25,8 +25,12 @@ def generate_sankey(transition_matrix_df, title, output_path, start_label="Start
     party_colors = {
         'PSOE': 'red', 'PP': 'blue', 'Cs': 'orange', 'VOX': 'green', 
         'IU': 'purple', 'Podemos': 'purple', 
-        'AA': 'purple', 'Adelante Andalucía': 'purple', # AA usually Purple/Green, sticking to Left block color for consistency or distinct?
-        'Andalucistas': 'teal', 'AxSi': 'darkturquoise',
+        'Adelante Andalucía': 'mediumpurple', 'AA': 'mediumpurple',
+        'AxSi': 'darkturquoise',
+        'PA': 'teal', 'CA': 'teal', # CA is Coalición Andalucista
+        'NA': 'darkgreen',
+        'PCPA': 'darkred', 'IZAR': 'firebrick',
+        'RISA': 'gold', 'PRAO': 'lightseagreen', 'PNdeA': 'olive',
         'Abstencion': 'grey', 'Otros': 'lightgrey'
     }
     

@@ -16,7 +16,7 @@ os.makedirs(GRAFICOS_DIR, exist_ok=True)
 
 st.set_page_config(page_title="Elecciones Andalucía - Trasvase de Votos", layout="wide")
 
-st.title("🗳️ Análisis de Trasvase de Votos - Andalucía")
+st.title("🗳️ Análisis de Trasvase de Votos - Andalucía (v2.0 - Partidos Separados)")
 st.markdown("""
 Esta aplicación permite estimar el flujo de votantes entre dos convocatorias electorales.
 Utiliza **K-Means Clustering** y **Regresión Lineal Restringida** para inferir el comportamiento.
@@ -236,25 +236,21 @@ if st.button("Ejecutar Análisis", type="primary"):
                         with open(path, 'r', encoding='utf-8') as f:
                             st.components.v1.html(f.read(), height=600)
                         
-                        col_t1, col_t2 = st.columns(2)
+                        st.subheader("📊 Porcentajes")
+                        st.caption(f"De {start_convocatoria} (Filas) a {end_convocatoria} (Columnas)")
+                        st.dataframe(matrix_pct.style.background_gradient(axis=None, cmap='Blues').format("{:.1%}"), use_container_width=True)
                         
-                        with col_t1:
-                            st.subheader("📊 Porcentajes")
-                            st.caption(f"De {start_convocatoria} (Filas) a {end_convocatoria} (Columnas)")
-                            st.dataframe(matrix_pct.style.background_gradient(axis=None, cmap='Blues').format("{:.1%}"), use_container_width=True)
+                        st.subheader("🗳️ Votos Estimados (Detalle)")
+                        st.info("""
+                        **Guía de lectura:**
+                        - **Filas (Izquierda)**: Partido al que votaron en la **Primera Elección** (Origen).
+                        - **Columnas (Arriba)**: Partido al que votaron en la **Segunda Elección** (Destino).
+                        - **Celda**: Número de personas que cambiaron su voto.
                         
-                        with col_t2:
-                            st.subheader("🗳️ Votos Estimados (Detalle)")
-                            st.info("""
-                            **Guía de lectura:**
-                            - **Filas (Izquierda)**: Partido al que votaron en la **Primera Elección** (Origen).
-                            - **Columnas (Arriba)**: Partido al que votaron en la **Segunda Elección** (Destino).
-                            - **Celda**: Número de personas que cambiaron su voto.
-                            
-                            *Ejemplo: La cifra en la fila 'PSOE' y columna 'VOX' son los antiguos votantes del PSOE que ahora votan a VOX.*
-                            """)
-                            matrix_abs = calculate_absolute_matrix(matrix_pct, subset, 'start', 'end')
-                            st.dataframe(matrix_abs.style.format("{:,}"), use_container_width=True)
+                        *Ejemplo: La cifra en la fila 'PSOE' y columna 'VOX' son los antiguos votantes del PSOE que ahora votan a VOX.*
+                        """)
+                        matrix_abs = calculate_absolute_matrix(matrix_pct, subset, 'start', 'end')
+                        st.dataframe(matrix_abs.style.format("{:,}"), use_container_width=True)
 
             st.markdown("---")
             

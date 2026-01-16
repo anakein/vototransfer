@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+venv/
+elec/
+.env
+
+# Streamlit
+.streamlit/
+
+# Project Specific
+graficos_web/
+pdf_content.txt
+*.pdf
+# Keep data? If huge maybe ignore, but usually needed for repo to work.
+# datos/normalizado.csv is ~13MB, acceptable for GitHub (<100MB).
