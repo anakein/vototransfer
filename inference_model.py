@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
 
-def estimate_transfer_matrix(df_cluster, parties_src, parties_dst, start_suffix, end_suffix):
+def estimate_transfer_matrix(df_cluster, parties_src, parties_dst, start_suffix, end_suffix, min_abstention_retention=0.0):
     """
     Estimates the vote transfer matrix P (dims: n_parties_src x n_parties_dst)
     such that V_dst ~= V_src * P
@@ -13,6 +13,7 @@ def estimate_transfer_matrix(df_cluster, parties_src, parties_dst, start_suffix,
     parties_dst: List of destination party names.
     start_suffix: Suffix for source columns (e.g. 'start').
     end_suffix: Suffix for destination columns (e.g. 'end').
+    min_abstention_retention: Minimum % of Abstention that must stay Abstention (0.0 to 1.0).
     """
     
     # Construct Matrices X (Source) and Y (Target)
@@ -68,6 +69,25 @@ def estimate_transfer_matrix(df_cluster, parties_src, parties_dst, start_suffix,
         
         concepts.append({'type': 'eq', 'fun': row_sum_constraint})
         
+    # 2. Structural Abstention Constraint
+    # If 'Abstencion' is in both (it should be), enforce P[Abst, Abst] >= min_retention
+    if min_abstention_retention > 0.0:
+        try:
+            # Find indices
+            # Note: parties names might be case sensitive? Usually 'Abstencion'.
+            src_abst_idx = parties_src.index('Abstencion')
+            dst_abst_idx = parties_dst.index('Abstencion')
+            
+            def abstention_retention_constraint(flat_P):
+                P = flat_P.reshape(n_src, n_dst)
+                # Value - Min >= 0  => Value >= Min
+                return P[src_abst_idx, dst_abst_idx] - min_abstention_retention
+            
+            concepts.append({'type': 'ineq', 'fun': abstention_retention_constraint})
+            print(f"Adding constraint: Abstention retention >= {min_abstention_retention:.1%}")
+        except ValueError:
+            pass # Abstencion not in list
+        
     # Bounds: 0 <= p_ij <= 1
     bounds = [(0, 1) for _ in range(n_src * n_dst)]
     
@@ -88,7 +108,7 @@ def estimate_transfer_matrix(df_cluster, parties_src, parties_dst, start_suffix,
     
     return transfer_df
 
-def run_inference_per_cluster(df, start_suffix='start', end_suffix='end'):
+def run_inference_per_cluster(df, start_suffix='start', end_suffix='end', min_abstention_retention=0.0):
     """
     Runs the estimation for each cluster found in the dataframe.
     Returns a dictionary of Transition Matrices.
@@ -122,7 +142,7 @@ def run_inference_per_cluster(df, start_suffix='start', end_suffix='end'):
         if len(subset) < len(parties_src): 
             print(f"Warning: Cluster {label} has fewer municipalities ({len(subset)}) than variables. Results may be unstable.")
         
-        P_matrix = estimate_transfer_matrix(subset, parties_src, parties_dst, start_suffix, end_suffix)
+        P_matrix = estimate_transfer_matrix(subset, parties_src, parties_dst, start_suffix, end_suffix, min_abstention_retention)
         results[label] = P_matrix
         
         print(f"Result for {label}:")
@@ -131,7 +151,7 @@ def run_inference_per_cluster(df, start_suffix='start', end_suffix='end'):
 
     # Run for Global (All Andalucia or filtered scope)
     print("Processing Global...")
-    global_P = estimate_transfer_matrix(df, parties_src, parties_dst, start_suffix, end_suffix)
+    global_P = estimate_transfer_matrix(df, parties_src, parties_dst, start_suffix, end_suffix, min_abstention_retention)
     results['Global'] = global_P
     
     return results
@@ -143,4 +163,4 @@ if __name__ == "__main__":
     # Test stub
     df = load_and_process_data("e:/appython/elecciones/andalucia/datos/normalizado.csv", "Convocatoria 2015/03", "Convocatoria 2018/12")
     df = perform_clustering(df, src_suffix='start')
-    results = run_inference_per_cluster(df, start_suffix='start', end_suffix='end')
+    results = run_inference_per_cluster(df, start_suffix='start', end_suffix='end', min_abstention_retention=0.5)

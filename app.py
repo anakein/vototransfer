@@ -61,6 +61,13 @@ elif scope_mode == "Por Municipio":
     # We also keep filter_province for context if needed, but the main filter is muni
     filter_province = sel_prov
 
+st.sidebar.markdown("### ⚙️ Parámetros del Modelo")
+min_abstention = st.sidebar.slider(
+    "Fidelidad Mínima Abstención", 
+    min_value=0.0, max_value=0.9, value=0.5, step=0.1,
+    help="Fuerza al modelo a que al menos este % de abstencionistas sigan absteniéndose. Ayuda a reducir flujos irreales."
+)
+
 # Execution
 if st.button("Ejecutar Análisis", type="primary"):
     with st.spinner("Procesando datos y generando modelo..."):
