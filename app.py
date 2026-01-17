@@ -62,10 +62,23 @@ elif scope_mode == "Por Municipio":
     filter_province = sel_prov
 
 st.sidebar.markdown("### ⚙️ Parámetros del Modelo")
-min_abstention = st.sidebar.slider(
+min_abstencion = st.sidebar.slider(
     "Fidelidad Mínima Abstención", 
     min_value=0.0, max_value=0.9, value=0.5, step=0.1,
     help="Fuerza al modelo a que al menos este % de abstencionistas sigan absteniéndose. Ayuda a reducir flujos irreales."
+)
+
+# regularization_val = st.sidebar.slider(
+#     "Estabilidad (Regularización)",
+#     min_value=0.0, max_value=0.005, value=0.0, step=0.001, format="%.4f",
+#     help="Micro-ajuste. 0.0=Off. Rango ultra-fino (0 a 0.005)."
+# )
+regularization_val = 0.0
+
+segmentation_mode = st.sidebar.radio(
+    "Tipo de Segmentación",
+    ["Por Voto (Clusters)", "Por Población (Rural/Urbano)"],
+    help="Define cómo agrupar los municipios para el análisis."
 )
 
 # Execution
@@ -96,14 +109,34 @@ if st.button("Ejecutar Análisis", type="primary"):
             if len(df) < 5:
                 st.warning("Hay muy pocos datos para generar un modelo fiable (menos de 5 municipios).")
             
-            # 2. Clustering
-            df = perform_clustering(df, n_clusters=3, src_suffix='start')
+            # 2. Segmentation
+            if segmentation_mode == "Por Población (Rural/Urbano)":
+                # Manual Segmentation based on Censo
+                censo_col = f"Censo_start"
+                
+                def label_population(censo):
+                    if censo < 10000: return "Rural (<10k)"
+                    if censo < 50000: return "Intermedio (10k-50k)"
+                    return "Urbano (>50k)"
+                
+                df['Cluster_Label'] = df[censo_col].apply(label_population)
+                # Assign numerical cluster for internal use if needed, though label is primary
+                df['Cluster'] = df[censo_col].apply(lambda x: 0 if x < 10000 else (1 if x < 50000 else 2))
+            else: 
+                # Default: Clustering by Vote
+                df = perform_clustering(df, n_clusters=3, src_suffix='start')
             
-            # Show map or stats
+            # Show map or stats (Chart removed as requested)
             st.subheader(f"Resultados: {start_convocatoria} -> {end_convocatoria}")
             
             # 3. Inference
-            results = run_inference_per_cluster(df, start_suffix='start', end_suffix='end')
+            results = run_inference_per_cluster(
+                df, 
+                start_suffix='start', 
+                end_suffix='end',
+                min_abstention_retention=min_abstencion,
+                regularization=regularization_val
+            )
             
             # Display
             # Display
@@ -248,22 +281,16 @@ if st.button("Ejecutar Análisis", type="primary"):
                         st.dataframe(matrix_pct.style.background_gradient(axis=None, cmap='Blues').format("{:.1%}"), use_container_width=True)
                         
                         st.subheader("🗳️ Votos Estimados (Detalle)")
-                        st.info("""
-                        **Guía de lectura:**
-                        - **Filas (Izquierda)**: Partido al que votaron en la **Primera Elección** (Origen).
-                        - **Columnas (Arriba)**: Partido al que votaron en la **Segunda Elección** (Destino).
-                        - **Celda**: Número de personas que cambiaron su voto.
+                        st.info("Filas: Origen (1ª Elección) -> Columnas: Destino (2ª Elección)")
                         
-                        *Ejemplo: La cifra en la fila 'PSOE' y columna 'VOX' son los antiguos votantes del PSOE que ahora votan a VOX.*
-                        """)
                         matrix_abs = calculate_absolute_matrix(matrix_pct, subset, 'start', 'end')
                         st.dataframe(matrix_abs.style.format("{:,}"), use_container_width=True)
 
             st.markdown("---")
             
-            if 'Cluster_Label' in df.columns:
-                st.write("### Distribución de clústeres")
-                st.bar_chart(df['Cluster_Label'].value_counts())
+            # if 'Cluster_Label' in df.columns:
+            #     st.write("### Distribución de clústeres")
+            #     st.bar_chart(df['Cluster_Label'].value_counts())
 
         except Exception as e:
             st.error(f"Error durante el análisis: {e}")

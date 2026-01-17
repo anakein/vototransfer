@@ -18,6 +18,11 @@ def load_and_process_data(filepath, year_start, year_end, province_filter=None, 
     # Load with low_memory=False to handle mixed types warning if needed
     df = pd.read_csv(filepath, low_memory=False)
 
+    # CRITICAL FIX: Eliminate Aggregation Rows (Province Totals labeled as 'Dato no disponible')
+    if 'Municipio' in df.columns:
+        df = df[df['Municipio'] != 'Dato no disponible']
+        df = df[df['Municipio'].notna()]
+
     # Filter Convocatorias
     df_start = df[df['Convocatoria'] == year_start].copy()
     df_end = df[df['Convocatoria'] == year_end].copy()

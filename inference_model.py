@@ -2,18 +2,14 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
 
-def estimate_transfer_matrix(df_cluster, parties_src, parties_dst, start_suffix, end_suffix, min_abstention_retention=0.0):
+def estimate_transfer_matrix(df_cluster, parties_src, parties_dst, start_suffix, end_suffix, min_abstention_retention=0.0, regularization=0.001):
     """
     Estimates the vote transfer matrix P (dims: n_parties_src x n_parties_dst)
     such that V_dst ~= V_src * P
     
     Arguments:
-    df_cluster: DataFrame containing vote COUNTS (or normalized counts).
-    parties_src: List of source party names.
-    parties_dst: List of destination party names.
-    start_suffix: Suffix for source columns (e.g. 'start').
-    end_suffix: Suffix for destination columns (e.g. 'end').
-    min_abstention_retention: Minimum % of Abstention that must stay Abstention (0.0 to 1.0).
+    min_abstention_retention: Minimum % of Abstention that must stay Abstention.
+    regularization: L2 Penalty weight to stabilize small party estimates (0.0 to 0.1).
     """
     
     # Construct Matrices X (Source) and Y (Target)
@@ -44,17 +40,26 @@ def estimate_transfer_matrix(df_cluster, parties_src, parties_dst, start_suffix,
     _, n_dst = Y_pct.shape
     
     # We want to find Matrix P of shape (n_src, n_dst)
-    # Flatten P to vector x of size n_src * n_dst
+    
+    # Regularization Target: Uniform Distribution (Maximum Entropy without info)
+    # This pulls unstable estimates towards "everyone gives a little to everyone" 
+    # instead of "100% to PP".
+    target_P = 1.0 / n_dst
     
     def loss_function(flat_P):
         P = flat_P.reshape(n_src, n_dst)
         Y_pred = X_pct @ P
         
         # Weighted Squared Error
-        # Scale residuals by sqrt(weight) so that squaring gives weighted error
         residuals = (Y_pct - Y_pred) * np.sqrt(weights[:, np.newaxis])
+        mse_loss = np.sum(residuals**2)
         
-        return np.sum(residuals**2)
+        # L2 Regularization (Ridge)
+        # Penalizes deviation from uniform distribution
+        # Scale by n_municipalities to keep it proportional to MSE (which sums over n_municipalities)
+        reg_loss = regularization * np.sum((P - target_P)**2) * n_municipalities 
+        
+        return mse_loss + reg_loss
     
     # Constraints
     # 1. Sum of rows of P must be 1 (votes from a source party must go somewhere)
@@ -84,7 +89,6 @@ def estimate_transfer_matrix(df_cluster, parties_src, parties_dst, start_suffix,
                 return P[src_abst_idx, dst_abst_idx] - min_abstention_retention
             
             concepts.append({'type': 'ineq', 'fun': abstention_retention_constraint})
-            print(f"Adding constraint: Abstention retention >= {min_abstention_retention:.1%}")
         except ValueError:
             pass # Abstencion not in list
         
@@ -95,7 +99,7 @@ def estimate_transfer_matrix(df_cluster, parties_src, parties_dst, start_suffix,
     initial_P = np.full((n_src, n_dst), 1.0 / n_dst).flatten()
     
     # Optimization
-    print(f"Optimizing transfer matrix ({n_src}x{n_dst})...")
+    print(f"Optimizing transfer matrix ({n_src}x{n_dst}) with Reg={regularization}...")
     result = minimize(loss_function, initial_P, method='SLSQP', bounds=bounds, constraints=concepts, tol=1e-4)
     
     if not result.success:
@@ -108,7 +112,7 @@ def estimate_transfer_matrix(df_cluster, parties_src, parties_dst, start_suffix,
     
     return transfer_df
 
-def run_inference_per_cluster(df, start_suffix='start', end_suffix='end', min_abstention_retention=0.0):
+def run_inference_per_cluster(df, start_suffix='start', end_suffix='end', min_abstention_retention=0.0, regularization=0.001):
     """
     Runs the estimation for each cluster found in the dataframe.
     Returns a dictionary of Transition Matrices.
@@ -142,7 +146,7 @@ def run_inference_per_cluster(df, start_suffix='start', end_suffix='end', min_ab
         if len(subset) < len(parties_src): 
             print(f"Warning: Cluster {label} has fewer municipalities ({len(subset)}) than variables. Results may be unstable.")
         
-        P_matrix = estimate_transfer_matrix(subset, parties_src, parties_dst, start_suffix, end_suffix, min_abstention_retention)
+        P_matrix = estimate_transfer_matrix(subset, parties_src, parties_dst, start_suffix, end_suffix, min_abstention_retention, regularization)
         results[label] = P_matrix
         
         print(f"Result for {label}:")
@@ -151,7 +155,7 @@ def run_inference_per_cluster(df, start_suffix='start', end_suffix='end', min_ab
 
     # Run for Global (All Andalucia or filtered scope)
     print("Processing Global...")
-    global_P = estimate_transfer_matrix(df, parties_src, parties_dst, start_suffix, end_suffix, min_abstention_retention)
+    global_P = estimate_transfer_matrix(df, parties_src, parties_dst, start_suffix, end_suffix, min_abstention_retention, regularization)
     results['Global'] = global_P
     
     return results
@@ -163,4 +167,4 @@ if __name__ == "__main__":
     # Test stub
     df = load_and_process_data("e:/appython/elecciones/andalucia/datos/normalizado.csv", "Convocatoria 2015/03", "Convocatoria 2018/12")
     df = perform_clustering(df, src_suffix='start')
-    results = run_inference_per_cluster(df, start_suffix='start', end_suffix='end', min_abstention_retention=0.5)
+    results = run_inference_per_cluster(df, start_suffix='start', end_suffix='end', min_abstention_retention=0.5, regularization=0.01)
